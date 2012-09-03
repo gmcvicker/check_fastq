@@ -51,7 +51,7 @@ typedef struct {
 
 
 
-static void check_line_len(ReadSeq *read, char *line, gzFile *f) {
+static void check_line_len(ReadSeq *read, char *line, gzFile f) {
   size_t len, n;
   char c;
 
@@ -96,7 +96,7 @@ static void check_line_len(ReadSeq *read, char *line, gzFile *f) {
 }
 
 
-static void seek_next_header(gzFile *f) {
+static void seek_next_header(gzFile f) {
   char c1, c2;
   size_t n;
 
@@ -123,7 +123,7 @@ static void seek_next_header(gzFile *f) {
 /** 
  * Reads the four lines of the fastq record
  */
-static int read_fastq_lines(ReadSeq *read, gzFile *f) {
+static int read_fastq_lines(ReadSeq *read, gzFile f) {
   /* read the four lines that make up fastq record */
   if(gzgets(f, read->line1, MAX_LINE) == NULL) {
     /* end of file */
@@ -308,7 +308,7 @@ static int check_qual(ReadSeq *read) {
  * Parses a read in fastq format.
  * Returns FASTQ_END at end of file, FASTQ_OK on success, FASTQ_ERR on problem
  */
-static int parse_fastq_read(ReadSeq *read, gzFile *f) {
+static int parse_fastq_read(ReadSeq *read, gzFile f) {
   size_t qual_len;
 
   read->status = FASTQ_OK;
@@ -444,7 +444,7 @@ static char *get_prefix(const char *output_dir, char *input_path) {
 
 int main(int argc, char **argv) {
   ReadSeq read;
-  gzFile *gzf, *out_gzf;
+  gzFile gzf, out_gzf;
   long rec_num, line_num, n_err;
   int file_num = 0;
   char min_qual, max_qual;

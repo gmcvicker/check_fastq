@@ -1,0 +1,4 @@
+*.o
+filter_dup_reads
+split_fastq
+check_fastq
