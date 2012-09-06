@@ -21,6 +21,9 @@
 #define FASTQ_ERR 1
 #define FASTQ_END -1
 
+#define MAX_WARN 1000
+static int warn_count = 0;
+
 
 typedef struct {
   char machine[MAX_LINE]; /* machine name */
@@ -105,8 +108,13 @@ static void seek_next_header(gzFile f) {
   while(c2 != -1) {
     if((c1 == '\n') && (c2 == '@')) {
       /* backup one byte to put '@' back on file stream */
-      gzseek(f, -1, SEEK_CUR);
-      fprintf(stderr, "skipped %ld bytes to find next fastq header line\n", n);
+      /* gzseek(f, -1, SEEK_CUR);*/
+      gzungetc(c2, f);
+
+      if(warn_count < MAX_WARN) {
+	fprintf(stderr, "skipped %ld bytes to find next fastq header line\n", 
+		n);
+      }
       return;
     }
     c1 = c2;
@@ -134,8 +142,11 @@ static int read_fastq_lines(ReadSeq *read, gzFile f) {
 
   /* check that this line was a header starting with '@' */
   if(read->line1[0] != '@') {
-    my_warn("%s:%d: fastq header line does not start with '@'",
-	    __FILE__, __LINE__);
+    if(warn_count < MAX_WARN) {
+      warn_count += 1;
+      my_warn("%s:%d: fastq header line does not start with '@'",
+	      __FILE__, __LINE__);
+    }
     read->status = FASTQ_ERR;
     read->line2[0] = '\0';
     read->line3[0] = '\0';
@@ -241,8 +252,11 @@ static int check_seq(ReadSeq *read) {
     j = 0;
     while(c != valid_nucs[j]) {
       if(valid_nucs[j] == '\0') {
-	my_warn("%s:%d: read contains invalid base '%c'", 
-		__FILE__, __LINE__, c);
+	if(warn_count < MAX_WARN) {
+	  warn_count += 1;
+	  my_warn("%s:%d: read contains invalid base '%c'", 
+		  __FILE__, __LINE__, c);
+	}
 	err = TRUE;
 	break;
       }
@@ -314,18 +328,19 @@ static int parse_fastq_read(ReadSeq *read, gzFile f) {
   if(read->status != FASTQ_OK) {
     return read->status;
   }
-
   
   /* check_header(read); */
   /* if(read->status != FASTQ_OK) { */
   /*   return read->status; */
   /* } */
 
-
   /* third line should start with '+' separator */
   if(read->line3[0] != '+') {
-    my_warn("%s:%d: third line does not start with '+'", 
-	  __FILE__, __LINE__);
+    if(warn_count < MAX_WARN) {
+      warn_count += 1;
+      my_warn("%s:%d: third line does not start with '+'", 
+	      __FILE__, __LINE__);
+    }
     read->status = FASTQ_ERR;
     return read->status;
   }
@@ -335,14 +350,20 @@ static int parse_fastq_read(ReadSeq *read, gzFile f) {
   qual_len = strlen(read->line4);
   
   if(read->read_len < 1) {
-    my_warn("%s:%d: read has no bases\n", __FILE__, __LINE__);
+    if(warn_count < MAX_WARN) {
+      warn_count += 1;
+      my_warn("%s:%d: read has no bases\n", __FILE__, __LINE__);
+    }
     return read->status;
   }
 
   /* next line should be quality scores */
   if(read->read_len != qual_len) {
-    my_warn("%s:%d: read len (%ld) does not match quality score len (%ld)",
-	  __FILE__, __LINE__, read->read_len, qual_len);
+    if(warn_count < MAX_WARN) {
+      warn_count += 1;
+      my_warn("%s:%d: read len (%ld) does not match quality score len (%ld)",
+	      __FILE__, __LINE__, read->read_len, qual_len);
+    }
     read->status = FASTQ_ERR;
     return read->status;
   }
@@ -407,7 +428,7 @@ int main(int argc, char **argv) {
 	      "[<repaired_output_file.txt.gz>]\n", argv[0]);
       exit(2);
     }
-
+	
     out_gzf = util_must_gzopen(argv[2], "wb");
     fprintf(stderr, "writing repaired fastq to '%s'\n", argv[2]);
   } else {
@@ -437,11 +458,14 @@ int main(int argc, char **argv) {
     }
 
     if(r == FASTQ_ERR) {
-      my_warn("%s:%d: invalid fastq record starting on line %ld:\n", 
-	      __FILE__, __LINE__, line_num);
+      if(warn_count < MAX_WARN) {
+	warn_count += 1;
+	my_warn("%s:%d: invalid fastq record starting on line %ld:\n", 
+		__FILE__, __LINE__, line_num);
+	fprintf(stderr, "  %s\n  %s\n  %s\n  %s\n", read.line1, 
+		read.line2, read.line3, read.line4);
+      }
       n_err += 1;
-      fprintf(stderr, "  %s\n  %s\n  %s\n  %s\n", read.line1, 
-	      read.line2, read.line3, read.line4);
     }
 
     if(r == FASTQ_OK) {
@@ -463,12 +487,12 @@ int main(int argc, char **argv) {
 	}
       }
     }
-
+	
     rec_num += 1;
     line_num += 4;
 
     if((rec_num % 1000000) == 0) {
-        fprintf(stderr, ".");
+      fprintf(stderr, ".");
     }
   }
 
